@@ -26,3 +26,14 @@ fprintf('\n=== CONCRETE: correlacao de cada entrada com a resistencia ===\n');
 for j = ord'
   fprintf('  %-18s r = %+.3f\n', C.names{j}, R(j, end));
 end
+
+% Scatter de cada entrada contra a resistencia
+f = L.plot_scatter_vs_y(C.X, C.y, C.names, 'Strength (MPa)');
+L.save_plot(f, 'concrete_scatter');
+close(f);
+
+% --- Melbourne: autocorrelacao testes, depois é retirar
+r = L.autocorrelation(M.y, 730);
+fprintf('\n=== MELBOURNE: ACF ===\n');
+fprintf('r(0)=%.3f  r(1)=%.3f  r(2)=%.3f  r(3)=%.3f  r(7)=%.3f\n', r(1), r(2), r(3), r(4), r(8));
+fprintf('r(182)=%.3f (meio ano)  r(365)=%.3f (um ano)\n', r(183), r(366));

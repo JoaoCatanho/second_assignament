@@ -6,6 +6,8 @@ L.check_series = @check_series
 L.plot_histograms = @plot_histograms
 L.save_plot = @save_plot
 L.plot_correlation_matrix = @plot_correlation_matrix;
+L.plot_scatter_vs_y = @plot_scatter_vs_y;
+L.autocorrelation = @autocorrelation
 % ... one handle per library function
 end
 
@@ -140,3 +142,35 @@ function [R, fig] = plot_correlation_matrix (X, names)
 
   title('Matriz de correlação (Pearson)')
 end 
+
+function fig = plot_scatter_vs_y(X, y, names, namey) 
+
+  p = size(X, 2);
+  nc = ceil(sqrt(p)); nr = ceil(p / nc);
+  fig = figure('Position', [50 50 1400 900]);
+
+  for j = 1:p 
+    subplot(nr, nc, j);
+    plot(X(:, j), y, '.', 'MarkerSize', 4);
+    set(gca, 'FontSize', 8);
+    r = corrcoef(X(:, j), y);
+    r = r(1, 2);
+    title(sprintf('%s (r = %.2f)', names{j}, r), 'FontSize', 10);
+    xlabel(names{j});
+    if mod(j - 1, nc) == 0
+      ylabel(namey);
+    end
+  end 
+end
+
+function r = autocorrelation(y, maxlag)
+
+  y = y(:) - mean(y); % ver se o dia esta acima da média ou abaixo ex: +3, -2
+  n = numel(y); % quantos dias
+  den = sum(y .^2); % a soma dos quadrados
+  r = zeros(maxlag + 1, 1);
+
+  for k = 0:maxlag
+    r(k+1) = sum(y(1:n-k) .* y(1+k:n)) /den;
+  end
+end
