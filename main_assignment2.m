@@ -15,3 +15,5 @@ M.info = L.check_series(M.dates, M.y);
 
 % ---- fase 2 ------ %
 f = L.plot_histograms([C.X C.y], [C.names {C.target}], [C.units {C.target_unit}]);
+L.save_plot(f, 'concrete_hist');
+close(f);
