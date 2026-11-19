@@ -8,6 +8,7 @@ L.save_plot = @save_plot
 L.plot_correlation_matrix = @plot_correlation_matrix;
 L.plot_scatter_vs_y = @plot_scatter_vs_y;
 L.autocorrelation = @autocorrelation
+L.plot_melbourne_eda = @plot_melbourne_eda
 % ... one handle per library function
 end
 
@@ -173,4 +174,70 @@ function r = autocorrelation(y, maxlag)
   for k = 0:maxlag
     r(k+1) = sum(y(1:n-k) .* y(1+k:n)) /den;
   end
+end
+
+% Figuras da EDA de Melbourne. Devolve um struct com os numeros-chave.
+function E = plot_melbourne_eda(dates, y, maxlag)
+  if nargin < 3, 
+    maxlag = 730; 
+  end
+  dv = datevec(dates);
+  mon = dv(:, 2);
+  doy = floor(dates - datenum(dv(:, 1), 1, 1)) + 1;
+
+% serie completa
+  f = figure('Position', [100 100 1100 400]);
+  plot(dates, y, '-', 'LineWidth', 0.5); datetick('x', 'yyyy');
+  xlabel('Data'); ylabel('T_{min} (C)'); title('Temperatura minima diaria - Melbourne');
+  save_plot(f, 'melb_serie'); close(f);
+
+% a distribuição das temperaturas
+  f = figure; hist(y, 40);
+  xlabel('T_{min} (C)'); ylabel('Frequencia'); title('Distribuicao da temperatura minima');
+  save_plot(f, 'melb_hist'); close(f);
+
+% comportamento mensal
+  E.month_mean = accumarray(mon, y, [12 1], @mean);
+  E.month_std  = accumarray(mon, y, [12 1], @std);
+  f = figure; errorbar(1:12, E.month_mean, E.month_std, 'o-');
+  set(gca, 'XTick', 1:12); xlim([0.5 12.5]);
+  xlabel('Mes'); ylabel('T_{min} (C)'); title('Media mensal (+- 1 desvio padrao)');
+  save_plot(f, 'melb_mensal'); close(f);
+
+% ciclo anual
+  E.doy_mean = accumarray(doy, y, [366 1], @mean);
+  n_doy = accumarray(doy, 1, [366 1]);      % quantos valores ha em cada dia do ano
+  E.doy_mean(n_doy == 0) = NaN;              % dias sem dados -> NaN (nao desenha)
+  f = figure('Position', [100 100 900 900]); hold on;
+  plot(doy, y, '.', 'Color', [0.75 0.75 0.75], 'MarkerSize', 6);
+  plot(1:366, E.doy_mean, 'r-', 'LineWidth', 1.5);
+  xlim([1 366]); xlabel('Dia do ano'); ylabel('T_{min} (C)');
+  legend('Valores diarios', 'Media por dia do ano'); title('Ciclo anual');
+  save_plot(f, 'melb_ciclo_anual'); close(f);
+
+% Autocorrelação onde usamos na função 5
+  E.acf = autocorrelation(y, maxlag);
+  n = numel(y); lim = 1.96 / sqrt(n);
+  f = figure('Position', [100 100 900 400]); hold on;
+  stem(0:maxlag, E.acf, 'Marker', 'none');
+  plot([0 maxlag], [lim lim], 'r--', [0 maxlag], -[lim lim], 'r--');
+  xlabel('Desfasamento k (dias)'); ylabel('r(k)'); title('Funcao de autocorrelacao');
+  save_plot(f, 'melb_acf'); close(f);
+
+% T(t) contra T(t+1)
+  f = figure; plot(y(1:end-1), y(2:end), '.', 'MarkerSize', 4); axis equal;
+  r1 = corrcoef(y(1:end-1), y(2:end)); E.r_lag1 = r1(1, 2);
+  xlabel('T(t)'); ylabel('T(t+1)'); title(sprintf('T(t) vs T(t+1), r = %.2f', E.r_lag1));
+  save_plot(f, 'melb_lag1'); close(f);
+
+% Abrupt changes
+  d = diff(y);
+  E.diff_std = std(d);
+  E.jumps = find(abs(d) > 4 * E.diff_std);
+  f = figure('Position', [100 100 1100 350]);
+  plot(dates(2:end), d, '-'); hold on;
+  plot(dates(1 + E.jumps), d(E.jumps), 'ro');
+  datetick('x', 'yyyy'); xlabel('Data'); ylabel('T(t) - T(t-1) (C)');
+  title('Variacao diaria (circulos: |variacao| > 4 desvios)');
+  save_plot(f, 'melb_variacoes'); close(f);
 end

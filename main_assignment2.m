@@ -37,3 +37,11 @@ r = L.autocorrelation(M.y, 730);
 fprintf('\n=== MELBOURNE: ACF ===\n');
 fprintf('r(0)=%.3f  r(1)=%.3f  r(2)=%.3f  r(3)=%.3f  r(7)=%.3f\n', r(1), r(2), r(3), r(4), r(8));
 fprintf('r(182)=%.3f (meio ano)  r(365)=%.3f (um ano)\n', r(183), r(366));
+
+% --- Melbourne
+E = L.plot_melbourne_eda(M.dates, M.y, 730);
+fprintf('\n=== MELBOURNE: EDA ===\n');
+fprintf('Mes mais quente: %.1f C | mes mais frio: %.1f C\n', max(E.month_mean), min(E.month_mean));
+fprintf('ACF: r(1)=%.3f r(2)=%.3f r(3)=%.3f r(182)=%.3f r(365)=%.3f\n', ...
+        E.acf(2), E.acf(3), E.acf(4), E.acf(183), E.acf(366));
+fprintf('Variacoes bruscas (> 4 desvios = %.1f C): %d\n', 4*E.diff_std, numel(E.jumps));
