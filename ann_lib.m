@@ -88,17 +88,25 @@ end
 % ----- fase 2 --------- %
 
 % Histograma de cada coluna, um subplot para cada variavel
-function fig = plot_histograms(X, names, units, nbins) 
-  if nargin < 4, 
-    nbins = 30 
-  end;
+function fig = plot_histograms(X, names, units, nbins)
+  if nargin < 4
+    nbins = 30;
+  end
   p = size(X, 2);
   nc = ceil(sqrt(p)); nr = ceil(p / nc);
-  fig = figure('Position', [100 100 1000 700]);
+  fig = figure('Position', [50 50 1400 900]);
   for j = 1:p
     subplot(nr, nc, j);
     hist(X(:, j), nbins);
-    title(names{j}); xlabel(units{j}); ylabel('Frequencia');
+    set(gca, 'FontSize', 8);                                  % letra pequena nos eixos
+    lo = min(X(:, j)); hi = max(X(:, j));
+    xlim([lo hi]);                                            % eixo do min ao max
+    set(gca, 'XTick', round(linspace(lo, hi, 4)));            % so 4 numeros, arredondados
+    title(names{j}, 'FontSize', 10);
+    xlabel(units{j});
+    if mod(j - 1, nc) == 0                                    % so na 1.a coluna
+      ylabel('Frequencia');
+    end
   end
 end
 
@@ -109,3 +117,9 @@ function save_plot(fig, name)
   end
   print(fig, fullfile('figures', [name '.png']), '-dpng', '-r150');
 end
+
+function plot_correlatio_matrix ()
+
+  
+
+end 
