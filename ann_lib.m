@@ -5,6 +5,7 @@ L.describe = @describe
 L.check_series = @check_series
 L.plot_histograms = @plot_histograms
 L.save_plot = @save_plot
+L.plot_correlation_matrix = @plot_correlation_matrix;
 % ... one handle per library function
 end
 
@@ -118,8 +119,24 @@ function save_plot(fig, name)
   print(fig, fullfile('figures', [name '.png']), '-dpng', '-r150');
 end
 
-function plot_correlatio_matrix ()
+% Matriz de Correlação de Pearson
+function [R, fig] = plot_correlation_matrix (X, names) 
 
-  
+  R = corrcoef(X);
+  p = size(R,1);
+  fig = figure('Position', [100 100 1300 1100]);
+  imagesc(R, [-1 1]); colorbar; axis square;
+  colormap(jet(64));
+  set(gca, 'XTick', 1:p, 'XTickLabel', {}, 'YTick', 1:p, 'YTickLabel', names, 'FontSize', 9);
+  for j = 1:p                                 
+    text(j, p + 0.7, names{j}, 'Rotation', 45, 'HorizontalAlignment', 'right', 'FontSize', 9);
+  end
 
+  for i = 1:p
+    for j = 1:p
+      text(j, i, sprintf('%.2f', R(i, j)), 'HorizontalAlignment', 'center', 'FontSize', 8);
+    end
+  end
+
+  title('Matriz de correlação (Pearson)')
 end 
