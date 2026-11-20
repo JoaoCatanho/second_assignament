@@ -9,6 +9,17 @@ L.plot_correlation_matrix = @plot_correlation_matrix;
 L.plot_scatter_vs_y = @plot_scatter_vs_y;
 L.autocorrelation = @autocorrelation
 L.plot_melbourne_eda = @plot_melbourne_eda
+L.concrete_features = @concrete_features;
+L.fill_gaps = @fill_gaps;
+L.pacf = @pacf;
+L.make_lags = @make_lags;
+L.split_chrono = @split_chrono;
+L.choose_window = @choose_window;
+L.split_random = @split_random;
+L.fit_scaler    = @fit_scaler;
+L.apply_scaler  = @apply_scaler;
+L.invert_scaler = @invert_scaler;
+  L.build_D = @build_D;
 % ... one handle per library function
 end
 
@@ -240,4 +251,129 @@ function E = plot_melbourne_eda(dates, y, maxlag)
   datetick('x', 'yyyy'); xlabel('Data'); ylabel('T(t) - T(t-1) (C)');
   title('Variacao diaria (circulos: |variacao| > 4 desvios)');
   save_plot(f, 'melb_variacoes'); close(f);
+end
+
+function [X2, names2, units2] = concrete_features(X, names, units)
+% Acrescenta log(idade) e razao agua/cimento as 8 entradas originais.
+  age    = X(:, 8);
+  water  = X(:, 4);
+  cement = X(:, 1);
+  X2     = [X, log(age), water ./ cement];
+  names2 = [names, {'logAge', 'W/C'}];
+  units2 = [units, {'log(dias)', '-'}];
+end
+
+% 
+function [dates2, y2, filled] = fill_gaps(dates, y)
+% Insere os dias em falta e preenche-os por interpolacao linear.
+  dates2 = (dates(1):dates(end))';
+  y2     = interp1(dates, y, dates2, 'linear'); % (dia anterior + dia aseguir)/2 
+  filled = ~ismember(dates2, dates);
+end
+
+function pc = pacf(y, maxlag)
+% Autocorrelacao parcial: para cada k, regressao de y(t) em y(t-1..t-k);
+% pacf(k) = coeficiente de y(t-k) (efeito DIRETO do lag k).
+  y = y(:) - mean(y);
+  n = numel(y);
+  pc = zeros(maxlag, 1);
+  for k = 1:maxlag
+    X = zeros(n - k, k);
+    for j = 1:k
+      X(:, j) = y(k+1-j : n-j);
+    end
+    t = y(k+1 : n);
+    b = X \ t;
+    pc(k) = b(k);
+  end
+end
+
+function [X, t, idx] = make_lags(y, dates, p)
+% Janela de p valores passados + sin/cos do dia do ano (do dia t).
+%   linha i:  X = [T(t-p+1) ... T(t)  sin(doy_t)  cos(doy_t)],  alvo = T(t+1)
+%   idx(i) = t  (indice do ultimo dia conhecido)
+  y = y(:); n = numel(y);
+  idx = (p:n-1)';
+  X = zeros(numel(idx), p);
+  for j = 1:p
+    X(:, j) = y(idx - p + j);
+  end
+  dv  = datevec(dates(idx));
+  doy = floor(dates(idx) - datenum(dv(:, 1), 1, 1)) + 1;
+  X = [X, sin(2*pi*doy/365.25), cos(2*pi*doy/365.25)];
+  t = y(idx + 1);
+end
+
+function [itr, iva, ite] = split_chrono(n, f_tr, f_va)
+% Particao cronologica: blocos consecutivos, sem baralhar.
+  ntr = round(f_tr * n);
+  nva = round(f_va * n);
+  itr = (1:ntr)';
+  iva = (ntr+1 : ntr+nva)';
+  ite = (ntr+nva+1 : n)';
+end
+
+function [best_p, tab] = choose_window(y, dates, plist, f_tr, f_va, tol)
+% Escolhe p com um modelo AR linear (+ sin/cos), avaliado SO na validacao.
+% Regra de parcimonia: o MENOR p cujo RMSE fica a menos de tol (0.1%) do melhor.
+  if nargin < 6
+    tol = 0.001;
+  end
+  tab  = zeros(numel(plist), 2);
+  pmax = max(plist);
+  for i = 1:numel(plist)
+    [X, t] = make_lags(y, dates, plist(i));
+    X = X(pmax - plist(i) + 1:end, :);
+    t = t(pmax - plist(i) + 1:end);
+    [itr, iva] = split_chrono(numel(t), f_tr, f_va);
+    A = [ones(numel(t), 1) X];
+    w = A(itr, :) \ t(itr);
+    e = A(iva, :) * w - t(iva);
+    tab(i, :) = [plist(i), sqrt(mean(e .^ 2))];
+  end
+  ok = tab(:, 2) <= min(tab(:, 2)) * (1 + tol);
+  best_p = tab(find(ok, 1), 1);
+end
+
+% Ramdom do csv
+function [itr, iva, ite] = split_random(n, f_tr, f_va, seed)
+% Particao aleatoria (semente fixa). Devolve indices.
+  rand('state', seed);
+  perm = randperm(n)';
+  ntr = round(f_tr * n);
+  nva = round(f_va * n);
+  itr = sort(perm(1:ntr));
+  iva = sort(perm(ntr+1 : ntr+nva));
+  ite = sort(perm(ntr+nva+1 : end));
+end
+
+function S = fit_scaler(X)
+% Media e desvio de cada coluna (chamar SO com o conjunto de treino).
+  S.mu    = mean(X, 1);
+  S.sigma = std(X, 0, 1);
+  S.sigma(S.sigma == 0) = 1;     % evita divisao por zero
+end
+
+function Z = apply_scaler(X, S)
+% Normaliza X com as estatisticas guardadas em S.
+  Z = (X - S.mu) ./ S.sigma;
+end
+
+function X = invert_scaler(Z, S)
+% Desfaz a normalizacao (volta as unidades originais).
+  X = Z .* S.sigma + S.mu;
+end
+
+function D = build_D(X, y, itr, iva, ite, names)
+% Normaliza (estatisticas so do treino) e monta o pacote D para o treino.
+  D.Sx = fit_scaler(X(itr, :));
+  D.Sy = fit_scaler(y(itr));
+  D.Xtr = apply_scaler(X(itr, :), D.Sx);  D.ytr = apply_scaler(y(itr), D.Sy);
+  D.Xva = apply_scaler(X(iva, :), D.Sx);  D.yva = apply_scaler(y(iva), D.Sy);
+  D.Xte = apply_scaler(X(ite, :), D.Sx);  D.yte = apply_scaler(y(ite), D.Sy);
+  D.mu_x = D.Sx.mu;  D.sigma_x = D.Sx.sigma;
+  D.mu_y = D.Sy.mu;  D.sigma_y = D.Sy.sigma;
+  D.idx   = struct('tr', itr, 'va', iva, 'te', ite);
+  D.names = names;
+  D.d     = size(X, 2);
 end
